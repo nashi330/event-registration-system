@@ -7,7 +7,8 @@ create table public.events (
     event_date timestamptz not null,
     venue text not null,
     scanner_pin text not null default '1234',
-    is_active boolean not null default true,
+    visibility text not null default 'public' check (visibility in ('public', 'exclusive')),
+    status text not null default 'active' check (status in ('active', 'closed', 'cancelled')),
     created_at timestamptz not null default now()
 );
 
@@ -20,6 +21,7 @@ create table public.attendees (
     email text not null,
     organization text not null,
     contact_number text not null,
+    status text not null default 'approved' check (status in ('approved', 'pending', 'declined')),
     checked_in boolean not null default false,
     checked_in_at timestamptz,
     created_at timestamptz not null default now(),
@@ -38,7 +40,7 @@ alter table public.attendees enable row level security;
 
 -- Public can view active events
 create policy "Public read active events" on public.events for
-select using (is_active = true);
+select using (status = 'active');
 
 -- Admins (authenticated) have full access to events
 create policy "Authenticated full access events" on public.events for all using (
@@ -55,7 +57,7 @@ with
             from public.events
             where
                 id = event_id
-                and is_active = true
+                    and status = 'active'
         )
     );
 
@@ -80,7 +82,7 @@ declare
 begin
   select exists(
     select 1 from public.events
-    where id = p_event_id and scanner_pin = p_scanner_pin and is_active = true
+    where id = p_event_id and scanner_pin = p_scanner_pin and status = 'active'
   ) into v_valid_pin;
 
   if not v_valid_pin then
@@ -174,3 +176,16 @@ select using (
                 id = auth.uid ()
         )
     );
+
+-- API role grants required for PostgREST access
+grant usage on schema public to anon, authenticated;
+
+grant select on table public.events to anon, authenticated;
+grant select, insert, update, delete on table public.events to authenticated;
+
+grant select, insert, update, delete on table public.attendees to authenticated;
+grant insert on table public.attendees to anon;
+
+grant select, update on table public.profiles to authenticated;
+
+grant execute on function public.verify_and_checkin(uuid, text, text) to anon, authenticated;

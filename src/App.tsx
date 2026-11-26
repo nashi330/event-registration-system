@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, LogOut, User } from 'lucide-react';
 import type { UserProfile } from './types/database';
-import { supabase, fetchUserProfile } from './lib/supabase';
+import { supabase, fetchUserProfile, isSupabaseConfigured } from './lib/supabase';
 import AuthPage from './pages/AuthPage';
 import RegisterPage from './pages/RegisterPage';
 import ScannerPage from './pages/ScannerPage';
@@ -26,6 +26,10 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    if (!isSupabaseConfigured) {
+      setInitializing(false);
+      return;
+    }
 
     const hydrate = async (userId: string) => {
       const profile = await fetchUserProfile(userId);
@@ -77,6 +81,21 @@ export default function App() {
     setCurrentUser(null);
     navigateTo('/');
   };
+
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="pastel-mesh-bg min-h-screen flex items-center justify-center p-4">
+        <div className="liquid-glass w-full max-w-lg rounded-[2rem] p-8 text-center">
+          <h1 className="text-2xl font-semibold text-slate-800">Supabase configuration required</h1>
+          <p className="mt-3 text-sm text-slate-600">
+            Add <code className="rounded bg-white/70 px-1.5 py-0.5">VITE_SUPABASE_URL</code> and{' '}
+            <code className="rounded bg-white/70 px-1.5 py-0.5">VITE_SUPABASE_ANON_KEY</code> to{' '}
+            <code className="rounded bg-white/70 px-1.5 py-0.5">.env.local</code>, then restart Vite.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (path === '/scanner' || path.startsWith('/scanner/')) {
     return <ScannerPage />;
